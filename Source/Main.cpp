@@ -1,19 +1,26 @@
 /*
-  ==============================================================================
-
-    This file was auto-generated!
-
-    It contains the basic startup code for a JUCE application.
-
-  ==============================================================================
-*/
+ ==============================================================================
+ 
+ This file was auto-generated!
+ 
+ It contains the basic startup code for a JUCE application.
+ 
+ ==============================================================================
+ */
 
 #include <JuceHeader.h>
+
+void printSection(String message)
+{
+    DBG( "\n\n=================================================================");
+    DBG( message );
+    DBG( "=================================================================\n\n");
+}
 
 //==============================================================================
 int main (int argc, char* argv[])
 {
-
+    
     // ..your code goes here!
     auto dataDir = File::getSpecialLocation(File::SpecialLocationType::userDesktopDirectory).getChildFile("PFM_Giveaway_data");
     
@@ -23,18 +30,16 @@ int main (int argc, char* argv[])
         return 1;
     }
     
+    printSection("opening customer list");
     /*
      open up the csv
-     extract all trial customers
-     extract all full course customers.
+     extract all of the trial customers
+     extract all of the full course customers
      eliminate trial customers that bought the full course.
      */
-    DBG( "\n\n=========================================================");
-    DBG( "opening customer list" );
-    DBG( "=========================================================\n\n");
     
-    auto customerCSV = dataDir.getChildFile("customers1.csv");
-    if(! customerCSV.existsAsFile() )
+    auto customerCSV = dataDir.getChildFile("customers.csv");
+    if( !customerCSV.existsAsFile() )
     {
         DBG( "customers.csv doesn't exist!!" );
         return 2;
@@ -44,103 +49,103 @@ int main (int argc, char* argv[])
     customerCSV.readLines(customers);
     
     /*
-     Trial product names:
-     PFM::C++ For Musicians Day 1-7 (old)
+     trial product:
      PFM::C++ For Musicians Day 1-7
+     PFM::C++ For Musicians Day 1-7 (old)
      */
     
     /*
-     full course names:
+     full course:
+     PFM::C++ For Musicians Round1
+     PFM::C++ For Musicians PRE-ORDER
+     PFM::C++ For Musicians Nov 2, 2019
      PFM::C++ For Musicians 2020
      PFM::C++ For Musicians
-     PFM::C++ For Musicians Nov 2, 2019
-     PFM::C++ For Musicians PRE-ORDER
-     PFM::C++ For Musicians Round1
-     PFM::C++ For Musicians Week 1
      */
-    
-    customers.remove(0); //column headers
+    customers.remove(0);
     std::unordered_set<String> trialCustomerEmails;
     std::unordered_set<String> fullCourseCustomerEmails;
-    DBG( "\n\n=========================================================");
-    DBG( "adding people who signed up for the trial or full course" );
-    DBG( "=========================================================\n\n");
     
-    for(auto customer : customers )
+    printSection("adding people who signed up for the trial or full course" );
+    for( auto customer : customers )
     {
+        /*
+         4th column is email
+         2nd column is product name
+         5th column is do-not-contact
+         6th column is purchase date
+         */
         auto customerData = StringArray::fromTokens(customer, ",", "\"");
-        //4th column is the email address
-        //2nd column is the product name.
-        //5th column is do-not-contact
         auto productName = customerData[1];
-        if(productName.equalsIgnoreCase("PFM::C++ For Musicians Day 1-7 (old)") ||
-           productName.equalsIgnoreCase("PFM::C++ For Musicians Day 1-7"))
+        if( productName.equalsIgnoreCase("PFM::C++ For Musicians Day 1-7") || productName.equalsIgnoreCase("PFM::C++ For Musicians Day 1-7 (old)"))
         {
             auto customerEmail = customerData[3];
             if( customerData[4] == "1" )
             {
-                DBG( "customer unsubscribed! " << customerEmail );
+                //DBG( "customer unsubscribed! " << customerEmail );
                 continue;
             }
+            
+            auto purchaseDate = customerData[5];
+            if( purchaseDate.contains("2020-06") )
+            {
+                DBG( "customer signed up after giveaway ended " << customerEmail );
+                continue;
+            }
+            
             if( customerEmail.contains("@") )
             {
                 auto [it, success] = trialCustomerEmails.insert(customerEmail);
-                if( !success)
-                    DBG( "duplicate signup for trial! " << customerEmail );
+                if( !success )
+                {
+                    //DBG( "duplicate signup for trial! " << customerEmail );
+                }
             }
         }
         
-        if(productName.equalsIgnoreCase("PFM::C++ For Musicians 2020") ||
-           productName.equalsIgnoreCase("PFM::C++ For Musicians") ||
-           productName.equalsIgnoreCase("PFM::C++ For Musicians Nov 2, 2019") ||
+        if(productName.equalsIgnoreCase("PFM::C++ For Musicians Round1") ||
            productName.equalsIgnoreCase("PFM::C++ For Musicians PRE-ORDER") ||
-           productName.equalsIgnoreCase("PFM::C++ For Musicians Round1") ||
-           productName.equalsIgnoreCase("PFM::C++ For Musicians Week 1"))
+           productName.equalsIgnoreCase("PFM::C++ For Musicians Nov 2, 2019") ||
+           productName.equalsIgnoreCase("PFM::C++ For Musicians 2020") ||
+           productName.equalsIgnoreCase("PFM::C++ For Musicians") )
         {
             auto customerEmail = customerData[3];
             if( customerData[4] == "1" )
             {
-                DBG( "customer unsubscribed! " << customerEmail );
+                //                DBG( "customer unsubscribed! " << customerEmail );
                 continue;
             }
             if( customerEmail.contains("@") )
             {
                 auto [it, success] = fullCourseCustomerEmails.insert(customerEmail);
                 if( !success )
-                    DBG( "customer already added to full course: " << customerEmail << " from product: " << productName );
+                {
+                    //                    DBG( "customer purchased the course twice!! " << customerEmail );
+                }
             }
         }
     }
     
     DBG( "Trial customers: " << trialCustomerEmails.size() );
     DBG( "full course customers: " << fullCourseCustomerEmails.size() );
-    jassertfalse;
     
-    /*
-     remove any emails from trialCustomers that are in fullCourseCustomers
-     if you bought the course, why would you enter the giveaway?
-     */
-    DBG( "\n\n=========================================================");
-    DBG( "removing full course customers from list of trial enrollees" );
-    DBG( "=========================================================\n\n");
+    printSection("removing full course customers from the list of trial enrollees" );
     
     struct Candidate
     {
         Candidate(String str, int i) : email(str), numEntries(i) { }
-        String email;
-        String slackID = "NO SLACK ID";
+        String email, slackID = "NO SLACK ID";
         int numEntries = 1;
-        
         void print() const { DBG( "email: " << email << " numEntries: " << numEntries << " slackID: " << slackID); }
     };
     
     std::vector<Candidate> candidates;
     candidates.reserve(trialCustomerEmails.size());
     
-    for(const auto& trialCustomerEmail : trialCustomerEmails )
+    for( const auto& trialCustomerEmail : trialCustomerEmails )
     {
         bool found = false;
-        for(const auto& fullCourseEmail : fullCourseCustomerEmails )
+        for( const auto& fullCourseEmail : fullCourseCustomerEmails )
         {
             if( trialCustomerEmail.equalsIgnoreCase(fullCourseEmail) )
             {
@@ -156,43 +161,37 @@ int main (int argc, char* argv[])
     }
     
     DBG( "numCandidates: " << candidates.size() );
-    jassertfalse;
-    /*
-     now parse the slack stuff
-     open users.json
-     */
-    DBG( "\n\n=========================================================");
-    DBG( "parsing Slack stuff.  beginning with users.json" );
-    DBG( "=========================================================\n\n");
     
+    /*
+     parse the Slack stuff
+     open the users.json
+     */
     auto slackUsers = dataDir.getChildFile("Slack").getChildFile("users.json");
-    if(! slackUsers.existsAsFile() )
+    if( !slackUsers.existsAsFile() )
     {
-        DBG( "users.json doesn't exist!!" );
-        return 2;
+        DBG( "users.json doesn't exist!!!" );
+        return 3;
     }
     
-    auto slackUsersJson = JSON::parse(slackUsers);
-    if(! slackUsersJson.isArray() )
+    auto slackUsersJSON = JSON::parse(slackUsers);
+    if( !slackUsersJSON.isArray() )
     {
         DBG( "users.json does not contain an array!" );
-        return 2;
+        return 4;
     }
     
-    auto slackUsersArray = *slackUsersJson.getArray();
+    auto slackUsersArray = *slackUsersJSON.getArray();
     /*
      each element is an object
-     object["id"] is what their messages will be sent under
-     object["profile"]["email"] is what their user email will be.
+     object["id"] is what their slack messages will be sent under
+     object["profile"]["email"] is their email address
      if they bought the full course, skip them.
      */
+    
     struct SlackUser
     {
         String ID, email;
     };
-    DBG( "\n\n=========================================================");
-    DBG( "creating a Slack Users list" );
-    DBG( "=========================================================\n\n");
     
     std::vector<SlackUser> slackUsersVector;
     slackUsersVector.reserve(slackUsersArray.size());
@@ -200,7 +199,7 @@ int main (int argc, char* argv[])
     for( auto slackUser : slackUsersArray )
     {
         jassert(slackUser.isObject());
-        if(! slackUser.isObject() )
+        if( !slackUser.isObject() )
         {
             continue;
         }
@@ -211,14 +210,13 @@ int main (int argc, char* argv[])
         if( email.isEmpty() )
             continue;
         
-        //if they bought the course, they aren't a candidate in the giveaway.
         bool boughtCourse = false;
-        for(const auto& customerEmail : fullCourseCustomerEmails )
+        for( const auto& customerEmail : fullCourseCustomerEmails )
         {
             if( customerEmail.equalsIgnoreCase(email) )
             {
                 boughtCourse = true;
-                DBG( "slack user enrolled in the full course: " << customerEmail );
+                DBG( "slack user enrolled in the full course " << customerEmail );
                 break;
             }
         }
@@ -226,14 +224,18 @@ int main (int argc, char* argv[])
         if( boughtCourse )
             continue;
         
-        //if they left the slack workspace, they don't get an entry for being in slack.
         if( slackUser["deleted"].equals(true) )
         {
             DBG( "user quit slack: " << email );
             continue;
         }
         
-        DBG( "id: " << id << " email: " << email );
+        //        DBG( "id: " << id << " email: " << email );
+        if( email.equalsIgnoreCase("matkatmusic@gmail.com") || email.equalsIgnoreCase("chordieapp@gmail.com") )
+        {
+            DBG( "skipping myself!" );
+            continue;
+        }
         
         SlackUser u;
         u.email = email;
@@ -243,13 +245,9 @@ int main (int argc, char* argv[])
     }
     
     DBG( "num slack users: " << slackUsersVector.size() );
-    jassertfalse;
-    /*
-     all of the people in SlackUsersVector get one extra entry
-     */
-    DBG( "\n\n=========================================================");
-    DBG( "adding an extra entry for candidates who joined slack" );
-    DBG( "=========================================================\n\n");
+    //    jassertfalse;
+    
+    printSection("adding an extra entry for candidates who joined slack" );
     
     for( auto& candidate : candidates )
     {
@@ -263,13 +261,10 @@ int main (int argc, char* argv[])
             }
         }
     }
-    jassertfalse;
+    
     /*
      anyone in slack who is not in candidates gets an entry as long as they didn't buy the course.
      */
-    DBG( "\n\n=========================================================");
-    DBG( "adding an entry for slack users who are not candidates yet" );
-    DBG( "=========================================================\n\n");
     auto candidatesClone = candidates;
     for( auto& slack : slackUsersVector )
     {
@@ -286,47 +281,46 @@ int main (int argc, char* argv[])
         if( found )
             continue;
         
-        bool boughtCourse = false;
-        for(const auto& email : fullCourseCustomerEmails )
+        auto boughtCourse = false;
+        for( const auto& customerEmail : fullCourseCustomerEmails )
         {
-            if( email.equalsIgnoreCase(slack.email) )
+            if( customerEmail.equalsIgnoreCase(slack.email) )
             {
                 boughtCourse = true;
-                DBG( "slack user enrolled in the full course: " << email );
+                DBG( "slack user enrolled in the full course " << customerEmail );
                 break;
             }
         }
-
+        
         if( boughtCourse )
             continue;
         
-        Candidate candidate {slack.email, 1};
+        Candidate candidate{slack.email, 1};
         candidate.slackID = slack.ID;
         DBG( "adding slack-only candidate: " << candidate.email );
         candidatesClone.push_back(candidate);
+        
     }
     
-    DBG( "num Candidates: " << candidatesClone.size() );
-    jassertfalse;
+    DBG( "num candidates: " << candidatesClone.size() );
+    
     /*
-     now parse channel-specific data.
+     now parse channel-specific data
      if the slack user shared a commit to a completed project, they get an entry.
      */
     
     /*
-     folder names:
      day3-project1
      day4-project2
      day5-project3-part1
      day6-project3-part2
      day7-project4-part1
      
-     load json as array
+     load json file, extract the array.
      each element is an object
-     obj["text"] must contain 'github.com'
-     obj["user"] is the slack ID of the candidate.
      
-     open each directory, open each json file in the directory.
+     obj["text"] must contain 'github.com' && "Project"
+     obj["user"] is their slack ID of the candidate
      */
     
     StringArray dirList;
@@ -336,20 +330,20 @@ int main (int argc, char* argv[])
     dirList.add("day6-project3-part2");
     dirList.add("day7-project4-part1");
     
-    DBG( "\n\n=========================================================");
-    DBG( "searching through Slack data for github submissions" );
-    DBG( "=========================================================\n\n");
+    printSection("searching through slack data for github submissions");
+    
     for( auto folder : dirList )
     {
         auto dayXFolder = dataDir.getChildFile("Slack").getChildFile(folder);
         if( !dayXFolder.exists() )
         {
-            DBG( "folder not found! " );
-            return 4;
+            DBG( "folder not found! " << dayXFolder.getFullPathName() );
+            return 5;
         }
+        
         if( dayXFolder.getNumberOfChildFiles(File::findFiles) == 0 )
         {
-            DBG( "folder is empty!" );
+            DBG( "folder is empty! " << dayXFolder.getFullPathName() );
             continue;
         }
         
@@ -357,80 +351,108 @@ int main (int argc, char* argv[])
         while( it.next() )
         {
             auto jsonFile = it.getFile();
+            if( jsonFile.getFileName().contains("2020-06") )
+            {
+                DBG( "skipping file because it's after the giveaway expiration: " << jsonFile.getFullPathName() );
+                continue;
+            }
+            
             auto json = JSON::parse(jsonFile);
             if( !json.isArray() )
             {
-                DBG( "Parse failed for file " << jsonFile.getFileName() );
+                DBG( "parsing failed for file: " << jsonFile.getFullPathName());
+                jassertfalse;
                 return 5;
             }
             
-            auto& arr = *json.getArray();
+            auto& arr = *json.getArray(); //juce::Array<var>
+            
             for( auto obj : arr )
             {
-                if( obj.isObject() && obj["text"].toString().contains("github.com") )
+                jassert(obj.isObject());
+                jassert(obj.hasProperty("text"));
+                auto messageText = obj["text"].toString();
+                if( messageText.isEmpty() )
                 {
+                    continue;
+                }
+                
+                if( messageText.contains("github.com") && messageText.contains("PFMCPP_Project") )
+                {
+                    //                    DBG( "messageText: " << messageText );
+                    auto slackUser = obj["user"].toString();
                     for( auto& candidate : candidatesClone )
                     {
-                        if( candidate.slackID == obj["user"].toString() )
+                        if( candidate.slackID == slackUser )
                         {
+                            if( candidate.email.equalsIgnoreCase("matkatmusic@gmail.com") || candidate.email.equalsIgnoreCase("chordieapp@gmail.com") )
+                            {
+                                DBG( "skipping messages from myself" );
+                                continue;
+                            }
+                            
                             ++candidate.numEntries;
                             if( candidate.numEntries > 7 )
+                            {
                                 candidate.numEntries = 7;
-                            if( candidate.numEntries == 7 )
                                 DBG( "candidate has 7 entries!! " << candidate.email );
+                            }
+                            break;
                         }
                     }
                 }
             }
         }
     }
-    jassertfalse;
     
-    DBG( "\n\n=========================================================");
-    DBG( "counting the number of candidates with X entries" );
-    DBG( "=========================================================\n\n");
+    printSection("counting the number of candidates with X entries" );
     std::vector<int> entryCounts { 0, 0, 0, 0, 0, 0, 0, 0 };
     for( auto& candidate : candidatesClone )
     {
         if( candidate.numEntries < entryCounts.size() )
-            ++entryCounts[ candidate.numEntries ];
+        {
+            entryCounts[candidate.numEntries] += 1;
+        }
     }
     
-    for( auto i = 0; i < entryCounts.size(); ++i )
+    for( int i = 0; i < entryCounts.size(); ++i )
     {
         DBG( "num candidates with " << i << " entries: " << entryCounts[i] );
     }
-    DBG( "total entries: " << candidatesClone.size() );
-    jassertfalse;
-    DBG( "\n\n=========================================================");
-    DBG( "creating the final list of candidates based on their number of entries earned" );
-    DBG( "=========================================================\n\n");
+    
+    printSection("creating the final list of candidates based on their number of entries earned");
+    
     std::vector<String> finalCandidateList;
     for( auto& candidate : candidatesClone )
     {
         for( int i = 0; i < candidate.numEntries; ++i )
         {
-            finalCandidateList.push_back( candidate.email );
+            finalCandidateList.push_back(candidate.email);
         }
     }
     
-    DBG( "\n\n=========================================================");
-    DBG( "picking the winner!" );
-    DBG( "=========================================================\n\n");
-    Random r;
-//    for( int i = 0; i < 10; ++i )
+    DBG("total entries: " << finalCandidateList.size());
+    
+    printSection("picking a winner!!" );
+    
+    //    for( int i = 0; i < 10; ++i )
     {
-        auto winner = r.nextInt( finalCandidateList.size() );
-        DBG( "winner IDX: " << winner << " email: " << finalCandidateList[winner]);
+        Random r;
+        auto winner = r.nextInt((int)finalCandidateList.size());
         DBG( "" );
+        DBG( "winner IDX: " << winner << " email: " << finalCandidateList[winner] );
+        auto winnerEmail = finalCandidateList[winner];
         for( auto& candidate : candidatesClone )
         {
-            if( candidate.email == finalCandidateList[winner])
+            if( candidate.email == winnerEmail )
             {
                 DBG( "winner earned " << (candidate.numEntries - 1) << " extra entries to improve their odds" );
             }
         }
+        DBG( "" );
+        //    }
+        
+        
+        
+        return 0;
     }
-    
-    return 0;
-}
