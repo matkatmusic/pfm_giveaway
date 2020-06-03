@@ -60,7 +60,7 @@ int main (int argc, char* argv[])
      */
     
     customers.remove(0); //column headers
-    std::unordered_set<String> trialCustomers;
+    std::unordered_set<String> trialCustomerEmails;
     std::unordered_set<String> fullCourseCustomerEmails;
     DBG( "\n\n=========================================================");
     DBG( "adding people who signed up for the trial or full course" );
@@ -71,14 +71,20 @@ int main (int argc, char* argv[])
         auto customerData = StringArray::fromTokens(customer, ",", "\"");
         //4th column is the email address
         //2nd column is the product name.
+        //5th column is do-not-contact
         auto productName = customerData[1];
         if(productName.equalsIgnoreCase("PFM::C++ For Musicians Day 1-7 (old)") ||
            productName.equalsIgnoreCase("PFM::C++ For Musicians Day 1-7"))
         {
             auto customerEmail = customerData[3];
-            if( customerEmail.contains("@"))
+            if( customerData[4] == "1" )
             {
-                auto [it, success] = trialCustomers.insert(customerEmail);
+                DBG( "customer unsubscribed! " << customerEmail );
+                continue;
+            }
+            if( customerEmail.contains("@") )
+            {
+                auto [it, success] = trialCustomerEmails.insert(customerEmail);
                 if( !success)
                     DBG( "duplicate signup for trial! " << customerEmail );
             }
@@ -92,7 +98,12 @@ int main (int argc, char* argv[])
            productName.equalsIgnoreCase("PFM::C++ For Musicians Week 1"))
         {
             auto customerEmail = customerData[3];
-            if( customerEmail.contains("@"))
+            if( customerData[4] == "1" )
+            {
+                DBG( "customer unsubscribed! " << customerEmail );
+                continue;
+            }
+            if( customerEmail.contains("@") )
             {
                 auto [it, success] = fullCourseCustomerEmails.insert(customerEmail);
                 if( !success )
@@ -101,9 +112,9 @@ int main (int argc, char* argv[])
         }
     }
     
-//    DBG( "Trial customers: " << trialCustomers.size() );
-//    DBG( "full course customers: " << fullCourseCustomers.size() );
-//    jassertfalse;
+    DBG( "Trial customers: " << trialCustomerEmails.size() );
+    DBG( "full course customers: " << fullCourseCustomerEmails.size() );
+    jassertfalse;
     
     /*
      remove any emails from trialCustomers that are in fullCourseCustomers
@@ -124,14 +135,14 @@ int main (int argc, char* argv[])
     };
     
     std::vector<Candidate> candidates;
-    candidates.reserve(trialCustomers.size());
+    candidates.reserve(trialCustomerEmails.size());
     
-    for(const auto& trial : trialCustomers )
+    for(const auto& trialCustomerEmail : trialCustomerEmails )
     {
         bool found = false;
-        for(const auto& full : fullCourseCustomerEmails )
+        for(const auto& fullCourseEmail : fullCourseCustomerEmails )
         {
-            if( trial.equalsIgnoreCase(full) )
+            if( trialCustomerEmail.equalsIgnoreCase(fullCourseEmail) )
             {
                 found = true;
                 break;
@@ -140,10 +151,12 @@ int main (int argc, char* argv[])
         
         if( !found )
         {
-            candidates.emplace_back(trial, 1);
+            candidates.emplace_back(trialCustomerEmail, 1);
         }
     }
     
+    DBG( "numCandidates: " << candidates.size() );
+    jassertfalse;
     /*
      now parse the slack stuff
      open users.json
@@ -166,7 +179,7 @@ int main (int argc, char* argv[])
         return 2;
     }
     
-    auto usersArray = *slackUsersJson.getArray();
+    auto slackUsersArray = *slackUsersJson.getArray();
     /*
      each element is an object
      object["id"] is what their messages will be sent under
@@ -182,28 +195,23 @@ int main (int argc, char* argv[])
     DBG( "=========================================================\n\n");
     
     std::vector<SlackUser> slackUsersVector;
-    slackUsersVector.reserve(usersArray.size());
+    slackUsersVector.reserve(slackUsersArray.size());
     
-    for( auto user : usersArray )
+    for( auto slackUser : slackUsersArray )
     {
-        jassert(user.isObject());
-        if(! user.isObject() )
+        jassert(slackUser.isObject());
+        if(! slackUser.isObject() )
         {
             continue;
         }
         
-        auto id = user["id"].toString();
-        auto email = user["profile"]["email"].toString();
-        
-        if( user["deleted"].equals(true) )
-        {
-            DBG( "user quit slack: " << email );
-            continue;
-        }
+        auto id = slackUser["id"].toString();
+        auto email = slackUser["profile"]["email"].toString();
         
         if( email.isEmpty() )
             continue;
         
+        //if they bought the course, they aren't a candidate in the giveaway.
         bool boughtCourse = false;
         for(const auto& customerEmail : fullCourseCustomerEmails )
         {
@@ -218,6 +226,13 @@ int main (int argc, char* argv[])
         if( boughtCourse )
             continue;
         
+        //if they left the slack workspace, they don't get an entry for being in slack.
+        if( slackUser["deleted"].equals(true) )
+        {
+            DBG( "user quit slack: " << email );
+            continue;
+        }
+        
         DBG( "id: " << id << " email: " << email );
         
         SlackUser u;
@@ -228,6 +243,7 @@ int main (int argc, char* argv[])
     }
     
     DBG( "num slack users: " << slackUsersVector.size() );
+    jassertfalse;
     /*
      all of the people in SlackUsersVector get one extra entry
      */
@@ -247,7 +263,7 @@ int main (int argc, char* argv[])
             }
         }
     }
-    
+    jassertfalse;
     /*
      anyone in slack who is not in candidates gets an entry as long as they didn't buy the course.
      */
@@ -291,7 +307,7 @@ int main (int argc, char* argv[])
     }
     
     DBG( "num Candidates: " << candidatesClone.size() );
-
+    jassertfalse;
     /*
      now parse channel-specific data.
      if the slack user shared a commit to a completed project, they get an entry.
@@ -368,6 +384,7 @@ int main (int argc, char* argv[])
             }
         }
     }
+    jassertfalse;
     
     DBG( "\n\n=========================================================");
     DBG( "counting the number of candidates with X entries" );
@@ -383,7 +400,8 @@ int main (int argc, char* argv[])
     {
         DBG( "num candidates with " << i << " entries: " << entryCounts[i] );
     }
-    
+    DBG( "total entries: " << candidatesClone.size() );
+    jassertfalse;
     DBG( "\n\n=========================================================");
     DBG( "creating the final list of candidates based on their number of entries earned" );
     DBG( "=========================================================\n\n");
@@ -400,10 +418,11 @@ int main (int argc, char* argv[])
     DBG( "picking the winner!" );
     DBG( "=========================================================\n\n");
     Random r;
-    for( int i = 0; i < 10; ++i )
+//    for( int i = 0; i < 10; ++i )
     {
         auto winner = r.nextInt( finalCandidateList.size() );
         DBG( "winner IDX: " << winner << " email: " << finalCandidateList[winner]);
+        DBG( "" );
         for( auto& candidate : candidatesClone )
         {
             if( candidate.email == finalCandidateList[winner])
